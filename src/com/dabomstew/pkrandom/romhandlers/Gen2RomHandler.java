@@ -32,13 +32,11 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.*;
 
-import com.dabomstew.pkrandom.FileFunctions;
-import com.dabomstew.pkrandom.GFXFunctions;
-import com.dabomstew.pkrandom.MiscTweak;
-import com.dabomstew.pkrandom.RomFunctions;
+import com.dabomstew.pkrandom.*;
 import com.dabomstew.pkrandom.constants.GBConstants;
 import com.dabomstew.pkrandom.constants.Gen2Constants;
 import com.dabomstew.pkrandom.constants.GlobalConstants;
+import com.dabomstew.pkrandom.constants.Species;
 import com.dabomstew.pkrandom.exceptions.RandomizerIOException;
 import com.dabomstew.pkrandom.pokemon.*;
 import compressors.Gen2Decmp;
@@ -632,7 +630,7 @@ public class Gen2RomHandler extends AbstractGBCRomHandler {
             bccES.encounters.add(enc);
         }
         // Unown is banned for Bug Catching Contest (5/8/2016)
-        bccES.bannedPokemon.add(pokes[Gen2Constants.unownIndex]);
+        bccES.bannedPokemon.add(pokes[Species.unown]);
         areas.add(bccES);
 
         return areas;
@@ -1121,7 +1119,17 @@ public class Gen2RomHandler extends AbstractGBCRomHandler {
 
     @Override
     public List<Pokemon> bannedForStaticPokemon() {
-        return Collections.singletonList(pokes[Gen2Constants.unownIndex]); // Unown banned
+        return Collections.singletonList(pokes[Species.unown]); // Unown banned
+    }
+
+    @Override
+    public boolean hasMainGameLegendaries() {
+        return false;
+    }
+
+    @Override
+    public List<Integer> getMainGameLegendaries() {
+        return new ArrayList<>();
     }
 
     @Override
@@ -1399,53 +1407,50 @@ public class Gen2RomHandler extends AbstractGBCRomHandler {
     }
 
     @Override
-    public void removeImpossibleEvolutions(boolean changeMoveEvos) {
+    public void removeImpossibleEvolutions(Settings settings) {
         // no move evos, so no need to check for those
-        log("--Removing Impossible Evolutions--");
         for (Pokemon pkmn : pokes) {
             if (pkmn != null) {
                 for (Evolution evol : pkmn.evolutionsFrom) {
                     if (evol.type == EvolutionType.TRADE || evol.type == EvolutionType.TRADE_ITEM) {
                         // change
-                        if (evol.from.number == Gen2Constants.slowpokeIndex) {
+                        if (evol.from.number == Species.slowpoke) {
                             // Slowpoke: Make water stone => Slowking
                             evol.type = EvolutionType.STONE;
                             evol.extraInfo = 24; // water stone
-                            logEvoChangeStone(evol.from.name, evol.to.name, itemNames[24]);
-                        } else if (evol.from.number == Gen2Constants.seadraIndex) {
+                            addEvoUpdateStone(impossibleEvolutionUpdates, evol, itemNames[24]);
+                        } else if (evol.from.number == Species.seadra) {
                             // Seadra: level 40
                             evol.type = EvolutionType.LEVEL;
                             evol.extraInfo = 40; // level
-                            logEvoChangeLevel(evol.from.name, evol.to.name, 40);
-                        } else if (evol.from.number == Gen2Constants.poliwhirlIndex || evol.type == EvolutionType.TRADE) {
+                            addEvoUpdateLevel(impossibleEvolutionUpdates, evol);
+                        } else if (evol.from.number == Species.poliwhirl || evol.type == EvolutionType.TRADE) {
                             // Poliwhirl or any of the original 4 trade evos
                             // Level 37
                             evol.type = EvolutionType.LEVEL;
                             evol.extraInfo = 37; // level
-                            logEvoChangeLevel(evol.from.name, evol.to.name, 37);
+                            addEvoUpdateLevel(impossibleEvolutionUpdates, evol);
                         } else {
                             // A new trade evo of a single stage Pokemon
                             // level 30
                             evol.type = EvolutionType.LEVEL;
                             evol.extraInfo = 30; // level
-                            logEvoChangeLevel(evol.from.name, evol.to.name, 30);
+                            addEvoUpdateLevel(impossibleEvolutionUpdates, evol);
                         }
                     }
                 }
             }
         }
-        logBlankLine();
 
     }
 
     @Override
-    public void makeEvolutionsEasier(boolean wildsRandomized) {
+    public void makeEvolutionsEasier(Settings settings) {
         // No such thing
     }
 
     @Override
     public void removeTimeBasedEvolutions() {
-        log("--Removing Timed-Based Evolutions--");
         for (Pokemon pkmn : pokes) {
             if (pkmn != null) {
                 for (Evolution evol : pkmn.evolutionsFrom) {
@@ -1454,17 +1459,17 @@ public class Gen2RomHandler extends AbstractGBCRomHandler {
                         // Eevee: Make sun stone => Espeon
                         evol.type = EvolutionType.STONE;
                         evol.extraInfo = 169; // sun stone
-                        logEvoChangeStone(evol.from.name, evol.to.name, itemNames[169]);
+                        addEvoUpdateStone(timeBasedEvolutionUpdates, evol, itemNames[169]);
                     } else if (evol.type == EvolutionType.HAPPINESS_NIGHT) {
                         // Eevee: Make moon stone => Umbreon
                         evol.type = EvolutionType.STONE;
                         evol.extraInfo = 8; // moon stone
-                        logEvoChangeStone(evol.from.name, evol.to.name, itemNames[8]);
+                        addEvoUpdateStone(timeBasedEvolutionUpdates, evol, itemNames[8]);
                     }
                 }
             }
         }
-        logBlankLine();
+
     }
 
     @Override
@@ -1761,7 +1766,7 @@ public class Gen2RomHandler extends AbstractGBCRomHandler {
         if (romEntry.arrayEntries.containsKey("CatchingTutorialOffsets")) {
             // Pick a pokemon
             int pokemon = this.random.nextInt(Gen2Constants.pokemonCount) + 1;
-            while (pokemon == Gen2Constants.unownIndex) {
+            while (pokemon == Species.unown) {
                 // Unown is banned
                 pokemon = this.random.nextInt(Gen2Constants.pokemonCount) + 1;
             }
@@ -1799,7 +1804,7 @@ public class Gen2RomHandler extends AbstractGBCRomHandler {
 
         // Pick a pokemon
         int pokemon = this.random.nextInt(Gen2Constants.pokemonCount) + 1;
-        while (pokemon == Gen2Constants.unownIndex) {
+        while (pokemon == Species.unown) {
             // Unown is banned
             pokemon = this.random.nextInt(Gen2Constants.pokemonCount) + 1;
         }
@@ -2305,7 +2310,7 @@ public class Gen2RomHandler extends AbstractGBCRomHandler {
     @Override
     public BufferedImage getMascotImage() {
         Pokemon mascot = randomPokemon();
-        while (mascot.number == Gen2Constants.unownIndex) {
+        while (mascot.number == Species.unown) {
             // Unown is banned as handling it would add a ton of extra effort.
             mascot = randomPokemon();
         }
